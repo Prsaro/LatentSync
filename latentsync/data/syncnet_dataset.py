@@ -26,10 +26,10 @@ from decord import AudioReader, VideoReader, cpu
 
 
 class SyncNetDataset(Dataset):
-    def __init__(self, data_dir: str, fileslist: str, config):
+    def __init__(self, data_dir: str, fileslist: str, config, base_dir=""):
         if fileslist != "":
             with open(fileslist) as file:
-                self.video_paths = [line.rstrip() for line in file]
+                self.video_paths = [os.path.join(base_dir, line.rstrip() + ".mp4") for line in file]
         elif data_dir != "":
             self.video_paths = gather_video_paths_recursively(data_dir)
         else:
@@ -53,7 +53,7 @@ class SyncNetDataset(Dataset):
         return len(self.video_paths)
 
     def read_audio(self, video_path: str):
-        ar = AudioReader(video_path, ctx=cpu(self.worker_id), sample_rate=self.audio_sample_rate)
+        ar = AudioReader(video_path[:-4]+".wav", ctx=cpu(self.worker_id), sample_rate=self.audio_sample_rate)
         original_mel = melspectrogram(ar[:].asnumpy().squeeze(0))
         return torch.from_numpy(original_mel)
 

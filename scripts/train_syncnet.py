@@ -35,6 +35,11 @@ from latentsync.utils.util import init_dist, cosine_loss
 
 logger = get_logger(__name__)
 
+# import debugpy
+
+# debugpy.listen(5678)
+# debugpy.wait_for_client()
+
 
 def main(config):
     # Initialize distributed training
@@ -74,8 +79,10 @@ def main(config):
         vae = None
 
     # Dataset and Dataloader setup
-    train_dataset = SyncNetDataset(config.data.train_data_dir, config.data.train_fileslist, config)
-    val_dataset = SyncNetDataset(config.data.val_data_dir, config.data.val_fileslist, config)
+    train_dataset = SyncNetDataset(config.data.train_data_dir, config.data.train_fileslist,
+                                   config, base_dir=config.data.base_data_dir)
+    val_dataset = SyncNetDataset(config.data.val_data_dir, config.data.val_fileslist,
+                                 config, base_dir=config.data.base_data_dir)
 
     train_distributed_sampler = DistributedSampler(
         train_dataset,
