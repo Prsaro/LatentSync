@@ -15,6 +15,7 @@
 import argparse
 import os
 from preprocess.affine_transform import affine_transform_multi_gpus
+from preprocess.gotu_affine_transform import gotu_affine_transform_multi_gpus
 from preprocess.remove_broken_videos import remove_broken_videos_multiprocessing
 from preprocess.detect_shot import detect_shot_multiprocessing
 from preprocess.filter_high_resolution import filter_high_resolution_multiprocessing

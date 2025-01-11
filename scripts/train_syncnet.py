@@ -35,10 +35,10 @@ from latentsync.utils.util import init_dist, cosine_loss
 
 logger = get_logger(__name__)
 
-# import debugpy
+import debugpy
 
-# debugpy.listen(5678)
-# debugpy.wait_for_client()
+debugpy.listen(5678)
+debugpy.wait_for_client()
 
 
 def main(config):

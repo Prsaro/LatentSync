@@ -22,9 +22,129 @@ import subprocess
 from multiprocessing import Process
 import shutil
 
+import os
+import cv2
+import sys
+import subprocess
+
+import numpy as np
+# import dlib
+import math
+
+from insightface.app import FaceAnalysis
+
 paths = []
 
+# detector = dlib.get_frontal_face_detector()
+# predictor = dlib.shape_predictor("/zjs/model/shape_predictor_68_face_landmarks.dat")
 
+detector_if = FaceAnalysis(name='antelopev2' ,allowed_modules=['detection', 'landmark_2d_106'])
+detector_if.prepare(ctx_id=0, det_size=(640, 640))
+
+MAP_LIST = [1, 10, 12, 14, 16, 3, 5, 7, 0, 23, 21, 19, 32, 30, 28, 26, 17, 43, 48, 49, 51, 50, 102, 103, 104, 105, 101, 72, 73, 74, 86, 78, 79, 80, 85, 84, 35, 41, 42, 39, 37, 36, 89, 95, 96, 93, 91, 90, 52, 64, 63, 71, 67, 68, 61, 58, 59, 53, 56, 55, 65, 66, 62, 70, 69, 57, 60, 54]
+
+eyed = 0.1125 #0.15
+
+def get_landmarks106_insightface(image):
+    faces = detector_if.get(image)
+    landmarks = None
+    for face in faces:
+        if face.landmark_2d_106 is not None:
+            landmarks = face.landmark_2d_106.astype(int)
+            break
+        else:
+            landmarks = None
+            print("face not detected")
+    return landmarks
+
+# def get_landmarks_dlib(image):
+#     landmarks_array = np.zeros((68, 2))
+#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#     faces = detector(gray)
+#     if len(faces) == 0:
+#         return None
+#     face = faces[0]
+#     landmarks = predictor(gray, face)
+#     for n in range(0, 68):
+#         landmarks_array[n] = (landmarks.part(n).x, landmarks.part(n).y)
+#     landmarks_array = landmarks_array.astype(np.float32)
+#     return landmarks_array
+
+def align_and_crop_face(image_path, pred_g, desired_face_width=256, desired_face_height=256, use_dlib_landmark=False):
+    # 检测关键点
+    image=cv2.imread(image_path)
+    keypoints = get_landmarks106_insightface(image)
+    if keypoints is None:
+        print("get landmarks failed, img_path is {}".format(image_path))
+        keypoints = pred_g
+    else:
+        pred_g = keypoints
+    if not use_dlib_landmark:
+        keypoints = keypoints[MAP_LIST].astype(np.float32)
+        left_eye_center = np.mean(keypoints[36:42], axis=0)
+        right_eye_center = np.mean(keypoints[42:48], axis=0)
+        left_head = np.mean(keypoints[0:3], axis=0)
+        right_head = np.mean(keypoints[14:17], axis=0)
+        nose = np.mean(keypoints[27:31], axis=0)
+        left_center = 0.125*left_eye_center + 0.375*left_head + 0.5 * nose
+        right_center = 0.125*right_eye_center + 0.375*right_head + 0.5 * nose
+        
+        face_center = (left_center + right_center) / 2
+        # 计算眼睛连线的角度，并增加60度
+        # 计算右眼相对于左眼的角度
+        angle = math.atan2(right_center[1] - left_center[1], 
+                        right_center[0] - left_center[0])
+        triangle_height = math.sqrt((right_center[0] - left_center[0])**2 +
+                                    (right_center[1] - left_center[1])**2) * math.sqrt(3) / 2
+
+        # 确定第三个点的位置
+        third_point = [face_center[0] - triangle_height * math.sin(angle),
+                        face_center[1] + triangle_height * math.cos(angle)]
+        # 定义仿射变换的源点和目标点
+        src_points = np.array([left_center, right_center, third_point], dtype='float32')
+        dst_points = np.array([[desired_face_width * (0.50-eyed), desired_face_height * 0.45],
+                            [desired_face_width * (0.50+eyed), desired_face_height * 0.45],
+                            [desired_face_width * 0.50, desired_face_height * (math.sqrt(3) * eyed  + 0.45)]], dtype='float32')
+        # 获取仿射变换矩阵
+        M = cv2.getAffineTransform(src_points, dst_points)
+        M_extended = np.vstack([M, [0, 0, 1]])
+        M_inv_extended = np.linalg.inv(M_extended)
+        M_inv = M_inv_extended[:2, :]
+        # 应用仿射变换
+        aligned = cv2.warpAffine(image, M, (desired_face_width, desired_face_height))
+        landmarks_transformed = cv2.transform(keypoints.reshape(1, -1, 2), M)[0]
+    else:
+        left_center = np.mean(keypoints[33:43], axis=0)
+        right_center = np.mean(keypoints[87:97], axis=0)
+        # 计算眼睛中心连线的中点
+        # eye_center = (left_eye_center + right_eye_center) / 2
+        face_center = (left_center + right_center) / 2
+
+        # 计算眼睛连线的角度，并增加60度
+        # 计算右眼相对于左眼的角度
+        angle = math.atan2(right_center[1] - left_center[1], 
+                        right_center[0] - left_center[0])
+        triangle_height = math.sqrt((right_center[0] - left_center[0])**2 +
+                                    (right_center[1] - left_center[1])**2) * math.sqrt(3) / 2
+
+        # 确定第三个点的位置
+        third_point = [face_center[0] - triangle_height * math.sin(angle),
+                    face_center[1] + triangle_height * math.cos(angle)]
+
+        # 定义仿射变换的源点和目标点
+        src_points = np.array([left_center, right_center, third_point], dtype='float32')
+        dst_points = np.array([[desired_face_width * (0.50-eyed), desired_face_height * 0.45],
+                            [desired_face_width * (0.50+eyed), desired_face_height * 0.45],
+                            [desired_face_width * 0.50, desired_face_height * (math.sqrt(3) * eyed  + 0.45)]], dtype='float32')
+        # 获取仿射变换矩阵
+        M = cv2.getAffineTransform(src_points, dst_points)
+        # 应用仿射变换
+        aligned = cv2.warpAffine(image, M, (desired_face_width, desired_face_height))
+        landmarks_transformed = cv2.transform(keypoints.reshape(1, -1, 2), M)[0]
+        landmarks_transformed = landmarks_transformed[MAP_LIST]
+    return aligned, src_points, keypoints, landmarks_transformed
+
+# 不需要更改
 def gather_video_paths(input_dir, output_dir):
     for video in sorted(os.listdir(input_dir)):
         if video.endswith(".mp4"):
@@ -45,7 +165,9 @@ class FaceDetector:
         video_frames = read_video(video_path, change_fps=False)
         results = []
         for frame in video_frames:
-            frame, _, _ = self.image_processor.affine_transform(frame)
+            # face, box, affine_matrix
+            # frame, _, _ = self.image_processor.affine_transform(frame)
+            frame, _, _, _ = align_and_crop_face(frame, None, 256, 256, use_dlib_landmark=False)
             results.append(frame)
         results = torch.stack(results)
 
@@ -99,7 +221,7 @@ def split(a, n):
     return (a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n))
 
 
-def affine_transform_multi_gpus(input_dir, output_dir, temp_dir, resolution, num_workers):
+def gotu_affine_transform_multi_gpus(input_dir, output_dir, temp_dir, resolution, num_workers):
     print(f"Recursively gathering video paths of {input_dir} ...")
     gather_video_paths(input_dir, output_dir)
     num_devices = torch.cuda.device_count()
