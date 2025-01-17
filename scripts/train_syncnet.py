@@ -35,12 +35,6 @@ from latentsync.utils.util import init_dist, cosine_loss
 
 logger = get_logger(__name__)
 
-import debugpy
-
-debugpy.listen(5678)
-debugpy.wait_for_client()
-
-
 def main(config):
     # Initialize distributed training
     local_rank = init_dist()
@@ -103,7 +97,7 @@ def main(config):
         drop_last=True,
         worker_init_fn=train_dataset.worker_init_fn,
     )
-    
+
     num_samples_limit = 640
 
     val_batch_size = min(
@@ -151,8 +145,6 @@ def main(config):
 
     num_update_steps_per_epoch = math.ceil(len(train_dataloader))
     num_train_epochs = math.ceil(config.run.max_train_steps / num_update_steps_per_epoch)
-    # validation_steps = int(config.ckpt.save_ckpt_steps // 5)
-    # validation_steps = 100
 
     if is_main_process:
         logger.info("***** Running training *****")

@@ -72,7 +72,10 @@ def get_landmarks106_insightface(image):
 
 def align_and_crop_face(image_path, pred_g, desired_face_width=256, desired_face_height=256, use_dlib_landmark=False):
     # 检测关键点
-    image=cv2.imread(image_path)
+    if isinstance(image_path, str):
+        image=cv2.imread(image_path)
+    else:
+        image = image_path
     keypoints = get_landmarks106_insightface(image)
     if keypoints is None:
         print("get landmarks failed, img_path is {}".format(image_path))
@@ -160,6 +163,7 @@ def gather_video_paths(input_dir, output_dir):
 class FaceDetector:
     def __init__(self, resolution: int = 512, device: str = "cpu"):
         self.image_processor = ImageProcessor(resolution, "fix_mask", device)
+        self.device = device
 
     def affine_transform_video(self, video_path):
         video_frames = read_video(video_path, change_fps=False)
@@ -168,10 +172,13 @@ class FaceDetector:
             # face, box, affine_matrix
             # frame, _, _ = self.image_processor.affine_transform(frame)
             frame, _, _, _ = align_and_crop_face(frame, None, 256, 256, use_dlib_landmark=False)
+            # frame_tensor = torch.from_numpy(frame).to(self.device)
+            # results.append(frame_tensor)
             results.append(frame)
-        results = torch.stack(results)
+        # results = torch.stack(results)
+        results = np.stack(results) # (102, 256, 256, 3)
 
-        results = rearrange(results, "f c h w -> f h w c").numpy()
+        # results = rearrange(results, "f c h w -> f h w c")
         return results
 
     def close(self):
@@ -180,19 +187,21 @@ class FaceDetector:
 
 def combine_video_audio(video_frames, video_input_path, video_output_path, process_temp_dir):
     video_name = os.path.basename(video_input_path)[:-4]
-    audio_temp = os.path.join(process_temp_dir, f"{video_name}_temp.wav")
+    # audio_temp = os.path.join(process_temp_dir, f"{video_name}_temp.wav")
+    # origin audio
+    audio_temp = video_input_path[:-4] + ".wav"
     video_temp = os.path.join(process_temp_dir, f"{video_name}_temp.mp4")
 
     write_video(video_temp, video_frames, fps=25)
 
-    command = f"ffmpeg -y -loglevel error -i {video_input_path} -q:a 0 -map a {audio_temp}"
-    subprocess.run(command, shell=True)
+    # command = f"ffmpeg -y -loglevel error -i {video_input_path} -q:a 0 -map a {audio_temp}"
+    # subprocess.run(command, shell=True)
 
     os.makedirs(os.path.dirname(video_output_path), exist_ok=True)
     command = f"ffmpeg -y -loglevel error -i {video_temp} -i {audio_temp} -c:v libx264 -c:a aac -map 0:v -map 1:a -q:v 0 -q:a 0 {video_output_path}"
     subprocess.run(command, shell=True)
 
-    os.remove(audio_temp)
+    # os.remove(audio_temp)
     os.remove(video_temp)
 
 

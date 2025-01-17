@@ -23,7 +23,7 @@ import torch
 
 
 def syncnet_eval(syncnet, syncnet_detector, video_path, temp_dir, detect_results_dir="detect_results"):
-    syncnet_detector(video_path=video_path, min_track=50)
+    syncnet_detector(video_path=video_path, min_track=35)
     crop_videos = os.listdir(os.path.join(detect_results_dir, "crop"))
     if crop_videos == []:
         raise Exception(red_text(f"Face not detected in {video_path}"))

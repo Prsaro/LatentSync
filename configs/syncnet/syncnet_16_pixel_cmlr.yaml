@@ -20,17 +20,17 @@ ckpt:
 data:
   train_output_dir: debug/syncnet
   num_val_samples: 2048
-  batch_size: 64 # 128
+  batch_size: 256 # 128
   num_workers: 11 # 11
   latent_space: false
   num_frames: 16
   resolution: 256
-  base_data_dir: /data/share/CMLRdataset
-  train_fileslist: /data/share/CMLRdataset/train.csv
+  base_data_dir: /data1/ckz/data/CMLRdataset/av_synced_3
+  train_fileslist: /data1/ckz/data/CMLRdataset/synced_3_trainset.csv
   train_data_dir: ""
-  val_fileslist: /data/share/CMLRdataset/val.csv
+  val_fileslist: /data1/ckz/data/CMLRdataset/synced_3_validationset.csv
   val_data_dir: ""
-  audio_mel_cache_dir: /data/share/CMLRdataset/audio_cache
+  audio_mel_cache_dir: /data1/ckz/data/CMLRdataset/audio_cache
   lower_half: true
   audio_sample_rate: 16000
   video_fps: 25

@@ -53,7 +53,7 @@ class SyncNetDataset(Dataset):
         return len(self.video_paths)
 
     def read_audio(self, video_path: str):
-        ar = AudioReader(video_path[:-4]+".wav", ctx=cpu(self.worker_id), sample_rate=self.audio_sample_rate)
+        ar = AudioReader(video_path, ctx=cpu(self.worker_id), sample_rate=self.audio_sample_rate)
         original_mel = melspectrogram(ar[:].asnumpy().squeeze(0))
         return torch.from_numpy(original_mel)
 
